@@ -8,6 +8,7 @@ import psycopg2
 from flask_cors import CORS
 from dotenv import load_dotenv
 from psycopg2 import Error as PGError
+from flask_asgi import WSGIMiddleware
 from psycopg2.extras import DictCursor
 from flask import Flask, jsonify, request
 from psycopg2.errors import UndefinedTable
@@ -753,6 +754,8 @@ api.add_namespace(pto_peniasco_client)
 api.add_namespace(twwg_las_palomas_client)
 api.add_namespace(slrc_1_client)
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))  # Usa 5000 como valor predeterminado
-    app.run(host="0.0.0.0", port=port, debug=True)
+app = WSGIMiddleware(app)
+
+# if __name__ == "__main__":
+#     port = int(os.environ.get("PORT", 5000))  # Usa 5000 como valor predeterminado
+#     app.run(host="0.0.0.0", port=port, debug=True)

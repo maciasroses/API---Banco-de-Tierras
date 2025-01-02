@@ -43,17 +43,26 @@ def create_connection():
         raise
 
 def execute_query(query, columns, params=None):
+    params = params or ()  # Evita problemas si params es None
     connection = create_connection()
     cursor = connection.cursor(cursor_factory=DictCursor)
     try:
-        cursor.execute(query, params or ())
+        cursor.execute(query, params)
         result = cursor.fetchall()
-        return [dict(zip(columns, row)) for row in result]
+        if result:
+            return [dict(zip(columns, row)) for row in result]
+        else:
+            return []  # O manejarlo como desees si no hay resultados
+    except psycopg2.Error as e:
+        print(f"Database error: {e}")
+        raise
     except Exception as e:
-        raise e
+        print(f"Unexpected error: {e}")
+        raise
     finally:
         cursor.close()
-        connection.close()
+        connection.close()  # O usa el connection pool si decides implementarlo
+
 
 generic_parser = reqparse.RequestParser()
 generic_parser.add_argument('page', type=int, help='Opcional: Número de página', default=1)

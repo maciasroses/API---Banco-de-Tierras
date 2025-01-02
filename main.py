@@ -15,28 +15,29 @@ from flask_restx import Api, Namespace, Resource, reqparse
 
 load_dotenv()
 
+HOST = os.getenv('DB_HOST')
+PORT = os.getenv('DB_PORT')
+USER = os.getenv('DB_USER')
+DATABASE = os.getenv('DB_NAME')
+PASSWORD = os.getenv('DB_PASSWORD')
+
+if not all([host, port, user, database, password]):
+    raise ValueError("Missing one or more required environment variables for database connection.")
+
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 api = Api(app, version='1.0', title='Banco de Tierras', description='API para obtener todos los datos de la base de datos de Banco de Tierras')
 
 def create_connection():
-    host = os.getenv('DB_HOST')
-    port = os.getenv('DB_PORT')
-    user = os.getenv('DB_USER')
-    database = os.getenv('DB_NAME')
-    password = os.getenv('DB_PASSWORD')
-
-    if not all([host, port, user, database, password]):
-        raise ValueError("Missing one or more required environment variables for database connection.")
-
     try:
         connection = psycopg2.connect(
-            host=os.getenv('DB_HOST'),
-            port=os.getenv('DB_PORT'),
-            user=os.getenv('DB_USER'),
-            database=os.getenv('DB_NAME'),
-            password=os.getenv('DB_PASSWORD')
+            user=USER,
+            password=PASSWORD,
+            host=HOST,
+            port=PORT,
+            dbname=DBNAME
         )
+        print("Connected to the database")
         return connection
     except PGError as e:
         print(f"Error connecting to the database: {e}")
@@ -62,7 +63,6 @@ def execute_query(query, columns, params=None):
     finally:
         cursor.close()
         connection.close()  # O usa el connection pool si decides implementarlo
-
 
 generic_parser = reqparse.RequestParser()
 generic_parser.add_argument('page', type=int, help='Opcional: Número de página', default=1)

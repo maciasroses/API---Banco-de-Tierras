@@ -754,4 +754,5 @@ api.add_namespace(twwg_las_palomas_client)
 api.add_namespace(slrc_1_client)
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))  # Usa 5000 como valor predeterminado
+    app.run(host="0.0.0.0", port=port, debug=True)

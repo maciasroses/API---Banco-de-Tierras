@@ -21,7 +21,7 @@ USER = os.getenv('DB_USER')
 DATABASE = os.getenv('DB_NAME')
 PASSWORD = os.getenv('DB_PASSWORD')
 
-if not all([host, port, user, database, password]):
+if not all([HOST, PORT, USER, DATABASE, PASSWORD]):
     raise ValueError("Missing one or more required environment variables for database connection.")
 
 app = Flask(__name__)

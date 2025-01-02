@@ -1,6 +1,5 @@
 flask
-uvicorn
-flask-asgi
+hypercorn
 flask-cors
 flask-restx
 python-dotenv

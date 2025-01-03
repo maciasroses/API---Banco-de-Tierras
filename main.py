@@ -36,13 +36,23 @@ def create_connection():
             host=HOST,
             port=PORT,
             dbname=DATABASE,
-            options='-4'
+            options='-4',
+            sslmode='require'
         )
         print("Connected to the database")
         return connection
     except PGError as e:
         print(f"Error connecting to the database: {e}")
         raise
+
+@app.route('/test-db', methods=['GET'])
+def test_db():
+    try:
+        connection = create_connection()
+        return {"message": "Connection successful"}
+    except Exception as e:
+        return {"message": f"Connection failed: {str(e)}"}, 500
+
 
 def execute_query(query, columns, params=None):
     params = params or ()  # Evita problemas si params es None

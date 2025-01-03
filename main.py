@@ -4,6 +4,7 @@
 # turn on the api = python3 main.py
 
 import os
+import socket
 import psycopg2
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -30,16 +31,20 @@ api = Api(app, version='1.0', title='Banco de Tierras', description='API para ob
 
 def create_connection():
     try:
+        ipv4_address = socket.gethostbyname(HOST)
         connection = psycopg2.connect(
             user=USER,
             password=PASSWORD,
-            host=HOST,
+            host=ipv4_address,
             port=PORT,
             dbname=DATABASE,
             sslmode='require'
         )
         print("Connected to the database")
         return connection
+    except socket.gaierror as e:
+        print(f"Error resolving the host: {e}")
+        raise
     except PGError as e:
         print(f"Error connecting to the database: {e}")
         raise

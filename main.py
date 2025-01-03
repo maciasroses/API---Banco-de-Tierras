@@ -36,7 +36,6 @@ def create_connection():
             host=HOST,
             port=PORT,
             dbname=DATABASE,
-            options='-4',
             sslmode='require'
         )
         print("Connected to the database")

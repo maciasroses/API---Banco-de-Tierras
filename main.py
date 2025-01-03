@@ -35,7 +35,8 @@ def create_connection():
             password=PASSWORD,
             host=HOST,
             port=PORT,
-            dbname=DATABASE
+            dbname=DATABASE,
+            options='-4'
         )
         print("Connected to the database")
         return connection

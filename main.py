@@ -84,213 +84,14 @@ generic_parser.add_argument('page', type=int, help='Opcional: Número de página
 generic_parser.add_argument('page_size', type=int, help='Opcional: Cantidad de registros por página', default=100)
 
 
-# -- Tabla principal: Propiedades
-# CREATE TABLE propiedades (
+# CREATE TABLE sociedad (
 #     id SERIAL PRIMARY KEY,
-#     proyecto_id INT NOT NULL REFERENCES proyectos(id) ON DELETE CASCADE,
-#     nombre VARCHAR(255) NOT NULL,
-#     propietario VARCHAR(255),
-#     clave_catastral VARCHAR(255) UNIQUE,
-#     localizacion VARCHAR(255),
-#     superficie_total_m2 DECIMAL(15, 2),
-#     base_predial DECIMAL(10, 2),
-#     adeudo_predial DECIMAL(10, 2),
-#     valor_comercial DECIMAL(15, 2),
-#     valor_comercial_usd DECIMAL(15, 2),
-#     anio_valor_comercial INT,
-#     participacion_porcentaje DECIMAL(3, 2),
-#     anios_pend_predial INT,
-#     comentarios TEXT,
-#     fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-# );
-propiedades_parser = reqparse.RequestParser()
-propiedades_parser.add_argument('clave_catastral', type=str, help='Opcional: Clave catastral de la propiedad')
-propiedades_parser.add_argument('proyecto_id', type=int, help='Opcional: ID del proyecto')
-propiedades_parser.add_argument('total_m2', type=bool, help='Opcional: Superficie total de todas las propiedades')
-propiedades_parser.add_argument('adeudo_predial', type=int, help='Opcional: Propiedades con adeudo predial mayor a X')
-
-propiedades_client = Namespace('propiedades', description='Propiedades de la base de datos')
-@propiedades_client.route('/')
-class Propiedades(Resource):
-    @api.expect(generic_parser, propiedades_parser)
-    def get(self):
-        args = generic_parser.parse_args()
-        another_args = propiedades_parser.parse_args()
-
-        total_m2 = another_args.get('total_m2')
-        proyecto_id = another_args.get('proyecto_id')
-        adeudo_predial = another_args.get('adeudo_predial')
-        clave_catastral = another_args.get('clave_catastral')
-
-        page = args.get('page')
-        page_size = args.get('page_size')
-        offset = (page - 1) * page_size
-
-        if total_m2:
-            query = """
-                SELECT 
-                    SUM(superficie_total_m2) AS total_superficie_m2
-                FROM propiedades;
-            """
-
-            columns = [
-                'total_superficie_m2'
-            ]
-
-            params = ()
-        else:
-            columns = [
-                'id',
-                'proyecto_id',
-                'nombre',
-                'propietario',
-                'clave_catastral',
-                'localizacion',
-                'superficie_total_m2',
-                'base_predial',
-                'adeudo_predial',
-                'valor_comercial',
-                'valor_comercial_usd',
-                'anio_valor_comercial',
-                'participacion_porcentaje',
-                'anios_pend_predial',
-                'comentarios',
-                'fecha_registro'
-            ]
-
-            if adeudo_predial:
-                query = """
-                    SELECT
-                        propiedades.id,
-                        propiedades.proyecto_id,
-                        propiedades.nombre,
-                        propiedades.propietario,
-                        propiedades.clave_catastral,
-                        propiedades.localizacion,
-                        propiedades.superficie_total_m2,
-                        propiedades.base_predial,
-                        propiedades.adeudo_predial,
-                        propiedades.valor_comercial,
-                        propiedades.valor_comercial_usd,
-                        propiedades.anio_valor_comercial,
-                        propiedades.participacion_porcentaje,
-                        propiedades.anios_pend_predial,
-                        propiedades.comentarios,
-                        propiedades.fecha_registro
-                    FROM propiedades
-                    WHERE
-                        propiedades.adeudo_predial > %s
-                    LIMIT %s OFFSET %s;
-                """
-
-                params = (adeudo_predial, page_size, offset)
-            else:
-                query = """
-                    SELECT
-                        propiedades.id,
-                        propiedades.proyecto_id,
-                        propiedades.nombre,
-                        propiedades.propietario,
-                        propiedades.clave_catastral,
-                        propiedades.localizacion,
-                        propiedades.superficie_total_m2,
-                        propiedades.base_predial,
-                        propiedades.adeudo_predial,
-                        propiedades.valor_comercial,
-                        propiedades.valor_comercial_usd,
-                        propiedades.anio_valor_comercial,
-                        propiedades.participacion_porcentaje,
-                        propiedades.anios_pend_predial,
-                        propiedades.comentarios,
-                        propiedades.fecha_registro
-                    FROM propiedades
-                    WHERE
-                        (%s IS NULL OR propiedades.clave_catastral = %s)
-                        AND (%s IS NULL OR propiedades.proyecto_id = %s)
-                    LIMIT %s OFFSET %s;
-                """
-
-                params = (clave_catastral, clave_catastral, proyecto_id, proyecto_id, page_size, offset)
-
-        try:
-            result = execute_query(query, columns, params)
-            return jsonify(result)
-        except PGError as e:
-            return jsonify({'message': str(e)})
-
-# -- Tabla Proyectos
-# CREATE TABLE proyectos (
-#     id SERIAL PRIMARY KEY,
-#     nombre VARCHAR(255) NOT NULL,
-#     propietario VARCHAR(255) NOT NULL,
-#     ubicacion VARCHAR(255),
-#     sociedad_id INT REFERENCES sociedades(id_sociedad) ON DELETE SET NULL
-# );
-proyectos_parser = reqparse.RequestParser()
-proyectos_parser.add_argument('nombre', type=str, help='Opcional: Nombre del proyecto')
-proyectos_parser.add_argument('sociedad_id', type=int, help='Opcional: ID de la sociedad')
-
-proyectos_client = Namespace('proyectos', description='Proyectos de la base de datos')
-@proyectos_client.route('/')
-class Proyectos(Resource):
-    @api.expect(generic_parser, proyectos_parser)
-    def get(self):
-        args = generic_parser.parse_args()
-        another_args = proyectos_parser.parse_args()
-
-        nombre = another_args.get('nombre')
-        sociedad_id = another_args.get('sociedad_id')
-
-        page = args.get('page')
-        page_size = args.get('page_size')
-        offset = (page - 1) * page_size
-
-        columns = [
-            'id',
-            'nombre',
-            'propietario',
-            'ubicacion',
-            'sociedad_id'
-        ]
-
-        query = """
-            SELECT
-                proyectos.id,
-                proyectos.nombre,
-                proyectos.propietario,
-                proyectos.ubicacion,
-                proyectos.sociedad_id
-            FROM proyectos
-            WHERE
-                (%s IS NULL OR proyectos.nombre = %s)
-                AND (%s IS NULL OR proyectos.sociedad_id = %s)
-            LIMIT %s OFFSET %s;
-        """
-
-        params = (nombre, nombre, sociedad_id, sociedad_id, page_size, offset)
-
-        try:
-            result = execute_query(query, columns, params)
-            return jsonify(result)
-        except PGError as e:
-            return jsonify({'message': str(e)})
-
-# -- Tabla Sociedades
-# CREATE TABLE sociedades (
-#     id_sociedad SERIAL PRIMARY KEY,
-#     nombre VARCHAR(255),
-#     ubicacion VARCHAR(255),
-#     propietario VARCHAR(255),
-#     sociedad VARCHAR(255) UNIQUE,
-#     estatus_legal VARCHAR(255),
-#     superficie_m2 DECIMAL(15, 2),
-#     suma_superficie DECIMAL(15, 2),
-#     participacion DECIMAL(15, 2),
-#     comentarios TEXT
+#     porcentaje_participacion FLOAT NOT NULL UNIQUE,
+#     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+#     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 # );
 sociedades_parser = reqparse.RequestParser()
-sociedades_parser.add_argument('nombre', type=str, help='Opcional: Nombre de la sociedad')
-sociedades_parser.add_argument('total_superficie', type=bool, help='Opcional: Superficie total de todas las sociedades')
+sociedades_parser.add_argument('porcentaje_participacion', type=float, help='Opcional: Porcentaje de participación')
 
 sociedades_client = Namespace('sociedades', description='Sociedades de la base de datos')
 @sociedades_client.route('/')
@@ -300,227 +101,7 @@ class Sociedades(Resource):
         args = generic_parser.parse_args()
         another_args = sociedades_parser.parse_args()
 
-        nombre = another_args.get('nombre')
-        total_superficie = another_args.get('total_superficie')
-
-        page = args.get('page')
-        page_size = args.get('page_size')
-        offset = (page - 1) * page_size
-
-        if total_superficie:
-            query = """
-                SELECT 
-                    SUM(superficie_m2) AS total_superficie_m2
-                FROM sociedades;
-            """
-
-            columns = [
-                'total_superficie_m2'
-            ]
-
-            params = ()
-        else:
-            columns = [
-                'id_sociedad',
-                'nombre',
-                'ubicacion',
-                'propietario',
-                'sociedad',
-                'estatus_legal',
-                'superficie_m2',
-                'suma_superficie',
-                'participacion',
-                'comentarios'
-            ]
-
-            query = """
-                SELECT
-                    sociedades.id_sociedad,
-                    sociedades.nombre,
-                    sociedades.ubicacion,
-                    sociedades.propietario,
-                    sociedades.sociedad,
-                    sociedades.estatus_legal,
-                    sociedades.superficie_m2,
-                    sociedades.suma_superficie,
-                    sociedades.participacion,
-                    sociedades.comentarios
-                FROM sociedades
-                WHERE
-                    (%s IS NULL OR sociedades.nombre = %s)
-                LIMIT %s OFFSET %s;
-            """
-
-            params = (nombre, nombre, page_size, offset)
-        
-        try:
-            result = execute_query(query, columns, params)
-            return jsonify(result)
-        except PGError as e:
-            return jsonify({'message': str(e)})
-
-# -- Tabla Contratos
-# CREATE TABLE contratos (
-#     id SERIAL PRIMARY KEY,
-#     propiedad_id INT NOT NULL REFERENCES propiedades(id) ON DELETE CASCADE,
-#     inquilino_nombre VARCHAR(255) NOT NULL,
-#     fecha_inicio DATE NOT NULL,
-#     fecha_fin_forzosa DATE,
-#     fecha_fin_no_forzosa DATE,
-#     duracion INTERVAL,
-#     renta_mensual DECIMAL(15, 2),
-#     politica_incrementos VARCHAR(255),
-#     tiempo_restante INT
-# );
-contratos_parser = reqparse.RequestParser()
-contratos_parser.add_argument('contratos_vigentes', type=bool, help='Opcional: Contratos vigentes')
-contratos_parser.add_argument('renta_total', type=bool, help='Opcional: Renta total de todos los contratos')
-
-contratos_client = Namespace('contratos', description='Contratos de la base de datos')
-@contratos_client.route('/')
-class Contratos(Resource):
-    @api.expect(generic_parser, contratos_parser)
-    def get(self):
-        args = generic_parser.parse_args()
-        another_args = contratos_parser.parse_args()
-
-        contratos_vigentes = another_args.get('contratos_vigentes')
-        renta_total = another_args.get('renta_total')
-
-        page = args.get('page')
-        page_size = args.get('page_size')
-        offset = (page - 1) * page_size
-
-        if renta_total:
-            query = """
-                SELECT 
-                    SUM(renta_mensual) AS total_renta_mensual
-                FROM contratos
-                WHERE fecha_fin_forzosa > CURRENT_DATE OR fecha_fin_forzosa IS NULL;
-            """
-
-            columns = [
-                'total_renta_mensual'
-            ]
-
-            params = ()
-        else:
-            if contratos_vigentes:
-                query = """
-                    SELECT *
-                    FROM contratos
-                    WHERE
-                        fecha_inicio <= CURRENT_DATE AND (fecha_fin_forzosa IS NULL OR fecha_fin_forzosa > CURRENT_DATE)
-                    LIMIT %s OFFSET %s;
-                """
-            else:
-                query = """
-                    SELECT *
-                    FROM contratos
-                    LIMIT %s OFFSET %s;
-                """
-
-            columns = [
-                'id',
-                'propiedad_id',
-                'inquilino_nombre',
-                'fecha_inicio',
-                'fecha_fin_forzosa',
-                'fecha_fin_no_forzosa',
-                'duracion',
-                'renta_mensual',
-                'politica_incrementos',
-                'tiempo_restante'
-            ]
-
-            params = (page_size,offset)
-
-        try:
-            result = execute_query(query, columns, params)
-            return jsonify(result)
-        except PGError as e:
-            return jsonify({'message': str(e)})
-
-# -- Tabla Finanzas
-# CREATE TABLE financieros (
-#     id SERIAL PRIMARY KEY,
-#     propiedad_id INT NOT NULL REFERENCES propiedades(id) ON DELETE CASCADE,
-#     renta_mensual DECIMAL(15, 2),
-#     politica_incrementos VARCHAR(255),
-#     renta_total DECIMAL(20, 2)
-# );
-finanzas_parser = reqparse.RequestParser()
-finanzas_parser.add_argument('renta_total', type=bool, help='Opcional: Renta total de todas las propiedades')
-
-finanzas_client = Namespace('finanzas', description='Finanzas de la base de datos')
-@finanzas_client.route('/')
-class Finanzas(Resource):
-    @api.expect(generic_parser, finanzas_parser)
-    def get(self):
-        args = generic_parser.parse_args()
-        another_args = finanzas_parser.parse_args()
-
-        renta_total = another_args.get('renta_total')
-
-        page = args.get('page')
-        page_size = args.get('page_size')
-        offset = (page - 1) * page_size
-
-        if renta_total:
-            query = """
-                SELECT 
-                    SUM(renta_total) AS total_renta_total
-                FROM financieros;
-            """
-
-            columns = [
-                'total_renta_total'
-            ]
-
-            params = ()
-        else:
-            columns = [
-                'id',
-                'propiedad_id',
-                'renta_mensual',
-                'politica_incrementos',
-                'renta_total'
-            ]
-
-            query = """
-                SELECT *
-                FROM financieros
-                LIMIT %s OFFSET %s;
-            """
-
-            params = (page_size, offset)
-
-        try:
-            result = execute_query(query, columns, params)
-            return jsonify(result)
-        except PGError as e:
-            return jsonify({'message': str(e)})
-
-# -- Tabla Incidencias
-# CREATE TABLE incidencias (
-#     id SERIAL PRIMARY KEY,
-#     propiedad_id INT REFERENCES propiedades(id) ON DELETE CASCADE,
-#     contrato_id INT REFERENCES contratos(id) ON DELETE CASCADE,
-#     descripcion TEXT NOT NULL,
-#     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-# );
-incidencias_parser = reqparse.RequestParser()
-incidencias_parser.add_argument('propiedad_id', type=int, help='Opcional: ID de la propiedad')
-
-incidencias_client = Namespace('incidencias', description='Incidencias de la base de datos')
-@incidencias_client.route('/')
-class Incidencias(Resource):
-    @api.expect(generic_parser, incidencias_parser)
-    def get(self):
-        args = generic_parser.parse_args()
-        another_args = incidencias_parser.parse_args()
-
-        propiedad_id = another_args.get('propiedad_id')
+        porcentaje_participacion = another_args.get('porcentaje_participacion')
 
         page = args.get('page')
         page_size = args.get('page_size')
@@ -528,21 +109,24 @@ class Incidencias(Resource):
 
         columns = [
             'id',
-            'propiedad_id',
-            'contrato_id',
-            'descripcion',
-            'fecha_creacion'
+            'porcentaje_participacion',
+            'created_at',
+            'updated_at'
         ]
 
         query = """
-            SELECT *
-            FROM incidencias
+            SELECT
+                id,
+                porcentaje_participacion,
+                created_at,
+                updated_at
+            FROM sociedad
             WHERE
-                (%s IS NULL OR incidencias.propiedad_id = %s)
+                (%s IS NULL OR porcentaje_participacion = %s)
             LIMIT %s OFFSET %s;
         """
 
-        params = (propiedad_id, propiedad_id, page_size, offset)
+        params = (porcentaje_participacion, porcentaje_participacion, page_size, offset)
 
         try:
             result = execute_query(query, columns, params)
@@ -550,169 +134,361 @@ class Incidencias(Resource):
         except PGError as e:
             return jsonify({'message': str(e)})
 
-# -- Ejemplo de tabla especializada: Bilbao Comercial
-# CREATE TABLE bilbao_comercial (
+# CREATE TABLE estatus_legal (
 #     id SERIAL PRIMARY KEY,
-#     propiedad_id INT NOT NULL REFERENCES propiedades(id),
-#     nombre_comercial VARCHAR(255),
-#     predial_participacion DECIMAL(10, 2)
+#     nombre VARCHAR(255) NOT NULL UNIQUE,
+#     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+#     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 # );
-bilbao_comercial_client = Namespace('bilbao_comercial', description='Bilbao Comercial de la base de datos')
-@bilbao_comercial_client.route('/')
-class BilbaoComercial(Resource):
-    @api.expect(generic_parser)
+estatus_legal_parser = reqparse.RequestParser()
+estatus_legal_parser.add_argument('nombre', type=str, help='Opcional: Nombre del estatus legal')
+
+estatus_legal_client = Namespace('estatus_legal', description='Estatus legal de la base de datos')
+@estatus_legal_client.route('/')
+class EstatusLegal(Resource):
+    @api.expect(generic_parser, estatus_legal_parser)
     def get(self):
         args = generic_parser.parse_args()
+        another_args = estatus_legal_parser.parse_args()
+
+        nombre = another_args.get('nombre')
 
         page = args.get('page')
         page_size = args.get('page_size')
         offset = (page - 1) * page_size
 
         columns = [
-            'propiedad_nombre',
-            'nombre_comercial',
-            'predial_participacion'
-        ]
-
-        query = """
-            SELECT p.nombre AS propiedad_nombre, b.nombre_comercial, b.predial_participacion
-            FROM bilbao_comercial b
-            JOIN propiedades p ON b.propiedad_id = p.id
-            LIMIT %s OFFSET %s;
-        """
-
-        params = (page_size, offset)
-
-        try:
-            result = execute_query(query, columns, params)
-            return jsonify(result)
-        except PGError as e:
-            return jsonify({'message': str(e)})
-
-# -- Ejemplo de tabla especializada: Andenes
-# CREATE TABLE andenes (
-#     id SERIAL PRIMARY KEY,
-#     propiedad_id INT NOT NULL REFERENCES propiedades(id),
-#     numero_andenes INT,
-#     clave_andenes DECIMAL(3, 2),
-#     nombre_andenes VARCHAR(255),
-#     vocacion VARCHAR(255),
-#     responsable VARCHAR(255),
-#     categoria VARCHAR(255),
-#     asesor VARCHAR(255),
-#     rango_precio VARCHAR(255)
-# );
-andenes_client = Namespace('andenes', description='Andenes de la base de datos')
-@andenes_client.route('/')
-class Andenes(Resource):
-    @api.expect(generic_parser)
-    def get(self):
-        args = generic_parser.parse_args()
-
-        page = args.get('page')
-        page_size = args.get('page_size')
-        offset = (page - 1) * page_size
-
-        columns = [
-            'propiedad_nombre',
-            'numero_andenes',
-            'clave_andenes',
-            'nombre_andenes',
-            'vocacion',
-            'responsable',
-            'categoria',
-            'asesor',
-            'rango_precio'
-        ]
-
-        query = """
-            SELECT p.nombre AS propiedad_nombre, a.numero_andenes, a.clave_andenes, a.nombre_andenes, a.vocacion, a.responsable, a.categoria, a.asesor, a.rango_precio
-            FROM andenes a
-            JOIN propiedades p ON a.propiedad_id = p.id
-            LIMIT %s OFFSET %s;
-        """
-
-        params = (page_size, offset)
-
-        try:
-            result = execute_query(query, columns, params)
-            return jsonify(result)
-        except PGError as e:
-            return jsonify({'message': str(e)})
-
-# -- Ejemplo de tabla especializada: Pto Peñasco
-# CREATE TABLE pto_peniasco (
-#     id SERIAL PRIMARY KEY,
-#     propiedad_id INT NOT NULL REFERENCES propiedades(id),
-#     terreno VARCHAR(255),
-#     base_predial DECIMAL(10, 2),
-#     adeudo_predial DECIMAL(10, 2),
-#     participacion_porcentaje DECIMAL(3, 2)
-# );
-pto_peniasco_client = Namespace('pto_peniasco', description='Pto Peñasco de la base de datos')
-@pto_peniasco_client.route('/')
-class PtoPeniasco(Resource):
-    @api.expect(generic_parser)
-    def get(self):
-        args = generic_parser.parse_args()
-
-        page = args.get('page')
-        page_size = args.get('page_size')
-        offset = (page - 1) * page_size
-
-        columns = [
-            'propiedad_nombre',
-            'terreno',
-            'base_predial',
-            'adeudo_predial',
-            'participacion_porcentaje'
-        ]
-
-        query = """
-            SELECT p.nombre AS propiedad_nombre, pp.terreno, pp.base_predial, pp.adeudo_predial, pp.participacion_porcentaje
-            FROM pto_peniasco pp
-            JOIN propiedades p ON pp.propiedad_id = p.id
-            LIMIT %s OFFSET %s;
-        """
-
-        params = (page_size, offset)
-
-        try:
-            result = execute_query(query, columns, params)
-            return jsonify(result)
-        except PGError as e:
-            return jsonify({'message': str(e)})
-
-# -- Ejemplo de tabla especializada: TWWG Las Palomas
-# CREATE TABLE twwg_las_palomas (
-#     id SERIAL PRIMARY KEY,
-#     propiedad_id INT NOT NULL REFERENCES propiedades(id),
-#     nombre VARCHAR(100),
-#     participacion_porcentaje DECIMAL(3, 2),
-#     comentarios TEXT
-# );
-twwg_las_palomas_client = Namespace('twwg_las_palomas', description='TWWG Las Palomas de la base de datos')
-@twwg_las_palomas_client.route('/')
-class TwwgLasPalomas(Resource):
-    @api.expect(generic_parser)
-    def get(self):
-        args = generic_parser.parse_args()
-
-        page = args.get('page')
-        page_size = args.get('page_size')
-        offset = (page - 1) * page_size
-
-        columns = [
-            'propiedad_nombre',
+            'id',
             'nombre',
-            'participacion_porcentaje',
-            'comentarios'
+            'created_at',
+            'updated_at'
         ]
 
         query = """
-            SELECT p.nombre AS propiedad_nombre, t.nombre, t.participacion_porcentaje, t.comentarios
-            FROM twwg_las_palomas t
-            JOIN propiedades p ON t.propiedad_id = p.id
+            SELECT
+                id,
+                nombre,
+                created_at,
+                updated_at
+            FROM estatus_legal
+            WHERE
+                (%s IS NULL OR nombre = %s)
+            LIMIT %s OFFSET %s;
+        """
+
+        params = (nombre, nombre, page_size, offset)
+
+        try:
+            result = execute_query(query, columns, params)
+            return jsonify(result)
+        except PGError as e:
+            return jsonify({'message': str(e)})
+
+# CREATE TABLE ubicacion (
+#     id SERIAL PRIMARY KEY,
+#     nombre VARCHAR(255) NOT NULL UNIQUE,
+#     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+#     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+# );
+ubicacion_parser = reqparse.RequestParser()
+ubicacion_parser.add_argument('nombre', type=str, help='Opcional: Nombre de la ubicación')
+
+ubicacion_client = Namespace('ubicacion', description='Ubicación de la base de datos')
+@ubicacion_client.route('/')
+class Ubicacion(Resource):
+    @api.expect(generic_parser, ubicacion_parser)
+    def get(self):
+        args = generic_parser.parse_args()
+        another_args = ubicacion_parser.parse_args()
+
+        nombre = another_args.get('nombre')
+
+        page = args.get('page')
+        page_size = args.get('page_size')
+        offset = (page - 1) * page_size
+
+        columns = [
+            'id',
+            'nombre',
+            'created_at',
+            'updated_at'
+        ]
+
+        query = """
+            SELECT
+                id,
+                nombre,
+                created_at,
+                updated_at
+            FROM ubicacion
+            WHERE
+                (%s IS NULL OR nombre = %s)
+            LIMIT %s OFFSET %s;
+        """
+
+        params = (nombre, nombre, page_size, offset)
+
+        try:
+            result = execute_query(query, columns, params)
+            return jsonify(result)
+        except PGError as e:
+            return jsonify({'message': str(e)})
+
+# CREATE TABLE proyecto (
+#     id SERIAL PRIMARY KEY,
+#     clave VARCHAR(255) NOT NULL UNIQUE,
+#     prioridad INT,
+#     nombre VARCHAR(255) NOT NULL UNIQUE,
+#     superficie_total FLOAT NOT NULL,
+#     propietario VARCHAR(255) NOT NULL,
+#     tipo_propiedad VARCHAR(255) NOT NULL,
+#     socios VARCHAR(255),
+#     rfc VARCHAR(255),
+#     tiene_garantia BOOLEAN,
+#     vocacion VARCHAR(255) NOT NULL,
+#     vocacion_especifica VARCHAR(255),
+#     responsable VARCHAR(255),
+#     estatus_activo_no_activo VARCHAR(255) NOT NULL,
+#     categoria VARCHAR(255) NOT NULL,
+#     comentarios TEXT,
+#     abogado VARCHAR(255),
+#     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+#     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+# );
+proyectos_parser = reqparse.RequestParser()
+proyectos_parser.add_argument('clave', type=str, help='Opcional: Clave del proyecto')
+proyectos_parser.add_argument('prioridad', type=int, help='Opcional: Prioridad del proyecto')
+proyectos_parser.add_argument('nombre', type=str, help='Opcional: Nombre del proyecto')
+proyectos_parser.add_argument('superficie_total', type=float, help='Opcional: Superficie total del proyecto')
+proyectos_parser.add_argument('propietario', type=str, help='Opcional: Propietario del proyecto')
+proyectos_parser.add_argument('tipo_propiedad', type=str, help='Opcional: Tipo de propiedad del proyecto')
+proyectos_parser.add_argument('socios', type=str, help='Opcional: Socios del proyecto')
+proyectos_parser.add_argument('rfc', type=str, help='Opcional: RFC del proyecto')
+proyectos_parser.add_argument('tiene_garantia', type=bool, help='Opcional: ¿Tiene garantía?')
+proyectos_parser.add_argument('vocacion', type=str, help='Opcional: Vocación del proyecto')
+proyectos_parser.add_argument('vocacion_especifica', type=str, help='Opcional: Vocación específica del proyecto')
+proyectos_parser.add_argument('responsable', type=str, help='Opcional: Responsable del proyecto')
+proyectos_parser.add_argument('estatus_activo_no_activo', type=str, help='Opcional: Estatus activo/no activo del proyecto')
+proyectos_parser.add_argument('categoria', type=str, help='Opcional: Categoría del proyecto')
+proyectos_parser.add_argument('abogado', type=str, help='Opcional: Abogado del proyecto')
+
+proyectos_client = Namespace('proyectos', description='Proyectos de la base de datos')
+@proyectos_client.route('/')
+class Proyectos(Resource):
+    @api.expect(generic_parser, proyectos_parser)
+    def get(self):
+        args = generic_parser.parse_args()
+        another_args = proyectos_parser.parse_args()
+
+        clave = another_args.get('clave')
+        prioridad = another_args.get('prioridad')
+        nombre = another_args.get('nombre')
+        superficie_total = another_args.get('superficie_total')
+        propietario = another_args.get('propietario')
+        tipo_propiedad = another_args.get('tipo_propiedad')
+        socios = another_args.get('socios')
+        rfc = another_args.get('rfc')
+        tiene_garantia = another_args.get('tiene_garantia')
+        vocacion = another_args.get('vocacion')
+        vocacion_especifica = another_args.get('vocacion_especifica')
+        responsable = another_args.get('responsable')
+        estatus_activo_no_activo = another_args.get('estatus_activo_no_activo')
+        categoria = another_args.get('categoria')
+        abogado = another_args.get('abogado')
+
+        page = args.get('page')
+        page_size = args.get('page_size')
+        offset = (page - 1) * page_size
+
+        columns = [
+            'id',
+            'clave',
+            'prioridad',
+            'nombre',
+            'superficie_total',
+            'propietario',
+            'tipo_propiedad',
+            'socios',
+            'rfc',
+            'tiene_garantia',
+            'vocacion',
+            'vocacion_especifica',
+            'responsable',
+            'estatus_activo_no_activo',
+            'categoria',
+            'comentarios',
+            'abogado',
+            'created_at',
+            'updated_at'
+        ]
+
+        query = """
+            SELECT
+                id,
+                clave,
+                prioridad,
+                nombre,
+                superficie_total,
+                propietario,
+                tipo_propiedad,
+                socios,
+                rfc,
+                tiene_garantia,
+                vocacion,
+                vocacion_especifica,
+                responsable,
+                estatus_activo_no_activo,
+                categoria,
+                comentarios,
+                abogado,
+                created_at,
+                updated_at
+            FROM proyecto
+            WHERE
+                (%s IS NULL OR clave = %s)
+                AND (%s IS NULL OR prioridad = %s)
+                AND (%s IS NULL OR nombre = %s)
+                AND (%s IS NULL OR superficie_total = %s)
+                AND (%s IS NULL OR propietario = %s)
+                AND (%s IS NULL OR tipo_propiedad = %s)
+                AND (%s IS NULL OR socios = %s)
+                AND (%s IS NULL OR rfc = %s)
+                AND (%s IS NULL OR tiene_garantia = %s)
+                AND (%s IS NULL OR vocacion = %s)
+                AND (%s IS NULL OR vocacion_especifica = %s)
+                AND (%s IS NULL OR responsable = %s)
+                AND (%s IS NULL OR estatus_activo_no_activo = %s)
+                AND (%s IS NULL OR categoria = %s)
+                AND (%s IS NULL OR abogado = %s)
+            LIMIT %s OFFSET %s;
+        """
+
+        params = (
+            clave, clave,
+            prioridad, prioridad,
+            nombre, nombre,
+            superficie_total, superficie_total,
+            propietario, propietario,
+            tipo_propiedad, tipo_propiedad,
+            socios, socios,
+            rfc, rfc,
+            tiene_garantia, tiene_garantia,
+            vocacion, vocacion,
+            vocacion_especifica, vocacion_especifica,
+            responsable, responsable,
+            estatus_activo_no_activo, estatus_activo_no_activo,
+            categoria, categoria,
+            abogado, abogado,
+            page_size, offset
+        )
+
+        try:
+            result = execute_query(query, columns, params)
+            return jsonify(result)
+        except PGError as e:
+            return jsonify({'message': str(e)})
+
+# CREATE TABLE proyecto_sociedad (
+#     id SERIAL PRIMARY KEY,
+#     valor FLOAT NOT NULL,
+#     proyecto_id INT NOT NULL REFERENCES proyecto(id) ON DELETE CASCADE,
+#     sociedad_id INT NOT NULL REFERENCES sociedad(id) ON DELETE CASCADE,
+#     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+#     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+#     UNIQUE (proyecto_id, sociedad_id)
+# );
+proyecto_sociedad_parser = reqparse.RequestParser()
+proyecto_sociedad_parser.add_argument('valor', type=float, help='Opcional: Valor de la sociedad')
+
+proyecto_sociedad_client = Namespace('proyecto_sociedad', description='Proyecto Sociedad de la base de datos')
+@proyecto_sociedad_client.route('/')
+class ProyectoSociedad(Resource):
+    @api.expect(generic_parser, proyecto_sociedad_parser)
+    def get(self):
+        args = generic_parser.parse_args()
+        another_args = proyecto_sociedad_parser.parse_args()
+
+        valor = another_args.get('valor')
+
+        page = args.get('page')
+        page_size = args.get('page_size')
+        offset = (page - 1) * page_size
+
+        columns = [
+            'id',
+            'valor',
+            'proyecto_id',
+            'sociedad_id',
+            'created_at',
+            'updated_at'
+        ]
+
+        query = """
+            SELECT
+                id,
+                valor,
+                proyecto_id,
+                sociedad_id,
+                created_at,
+                updated_at
+            FROM proyecto_sociedad
+            WHERE
+                (%s IS NULL OR valor = %s)
+            LIMIT %s OFFSET %s;
+        """
+
+        params = (valor, valor, page_size, offset)
+
+        try:
+            result = execute_query(query, columns, params)
+            return jsonify(result)
+        except PGError as e:
+            return jsonify({'message': str(e)})
+
+# CREATE TABLE proyecto_estatus_ubicacion (
+#     id SERIAL PRIMARY KEY,
+#     proyecto_id INT NOT NULL REFERENCES proyecto(id) ON DELETE CASCADE,
+#     ubicacion_id INT NOT NULL REFERENCES ubicacion(id) ON DELETE CASCADE,
+#     estatus_legal_id INT NOT NULL REFERENCES estatus_legal(id) ON DELETE CASCADE,
+#     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+#     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+#     UNIQUE (
+#         proyecto_id,
+#         ubicacion_id,
+#         estatus_legal_id
+#     )
+# );
+proyecto_estatus_ubicacion_parser = reqparse.RequestParser()
+
+proyecto_estatus_ubicacion_client = Namespace('proyecto_estatus_ubicacion', description='Proyecto Estatus Ubicación de la base de datos')
+@proyecto_estatus_ubicacion_client.route('/')
+class ProyectoEstatusUbicacion(Resource):
+    @api.expect(generic_parser, proyecto_estatus_ubicacion_parser)
+    def get(self):
+        args = generic_parser.parse_args()
+
+        page = args.get('page')
+        page_size = args.get('page_size')
+        offset = (page - 1) * page_size
+
+        columns = [
+            'id',
+            'proyecto_id',
+            'ubicacion_id',
+            'estatus_legal_id',
+            'created_at',
+            'updated_at'
+        ]
+
+        query = """
+            SELECT
+                id,
+                proyecto_id,
+                ubicacion_id,
+                estatus_legal_id,
+                created_at,
+                updated_at
+            FROM proyecto_estatus_ubicacion
             LIMIT %s OFFSET %s;
         """
 
@@ -724,46 +500,125 @@ class TwwgLasPalomas(Resource):
         except PGError as e:
             return jsonify({'message': str(e)})
 
-# -- Ejemplo de tabla especializada: SLRC 1
-# CREATE TABLE slrc_1 (
+# CREATE TABLE propiedad (
 #     id SERIAL PRIMARY KEY,
-#     propiedad_id INT NOT NULL REFERENCES propiedades(id),
-#     nombre_terreno VARCHAR(255),
-#     numero_fraccion INT,
-#     base_predial DECIMAL(10, 2),
-#     adeudo_predial DECIMAL(10, 2),
+#     clave VARCHAR(255) NOT NULL UNIQUE,
+#     nombre VARCHAR(255) NOT NULL,
+#     superficie FLOAT NOT NULL,
+#     valor_comercial FLOAT NOT NULL,
+#     valor_comercial_usd FLOAT NOT NULL,
+#     anio_valor_comercial INT,
+#     clave_catastral VARCHAR(255) NOT NULL,
+#     base_predial FLOAT NOT NULL,
+#     adeudo_predial FLOAT,
 #     anios_pend_predial INT,
-#     comentarios TEXT
+#     comentarios TEXT,
+#     proyecto_id INT NOT NULL REFERENCES proyecto(id) ON DELETE CASCADE,
+#     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+#     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 # );
-slrc_1_client = Namespace('slrc_1', description='SLRC 1 de la base de datos')
-@slrc_1_client.route('/')
-class Slrc1(Resource):
-    @api.expect(generic_parser)
+propiedades_parser = reqparse.RequestParser()
+propiedades_parser.add_argument('clave', type=str, help='Opcional: Clave de la propiedad')
+propiedades_parser.add_argument('nombre', type=str, help='Opcional: Nombre de la propiedad')
+propiedades_parser.add_argument('superficie', type=float, help='Opcional: Superficie de la propiedad')
+propiedades_parser.add_argument('valor_comercial', type=float, help='Opcional: Valor comercial de la propiedad')
+propiedades_parser.add_argument('valor_comercial_usd', type=float, help='Opcional: Valor comercial en USD de la propiedad')
+propiedades_parser.add_argument('anio_valor_comercial', type=int, help='Opcional: Año del valor comercial de la propiedad')
+propiedades_parser.add_argument('clave_catastral', type=str, help='Opcional: Clave catastral de la propiedad')
+propiedades_parser.add_argument('base_predial', type=float, help='Opcional: Base predial de la propiedad')
+propiedades_parser.add_argument('adeudo_predial', type=float, help='Opcional: Adeudo predial de la propiedad')
+propiedades_parser.add_argument('anios_pend_predial', type=int, help='Opcional: Años pendientes de predial de la propiedad')
+propiedades_parser.add_argument('proyecto_id', type=int, help='Opcional: ID del proyecto')
+
+propiedades_client = Namespace('propiedades', description='Propiedades de la base de datos')
+@propiedades_client.route('/')
+class Propiedades(Resource):
+    @api.expect(generic_parser, propiedades_parser)
     def get(self):
         args = generic_parser.parse_args()
+        another_args = propiedades_parser.parse_args()
+
+        clave = another_args.get('clave')
+        nombre = another_args.get('nombre')
+        superficie = another_args.get('superficie')
+        valor_comercial = another_args.get('valor_comercial')
+        valor_comercial_usd = another_args.get('valor_comercial_usd')
+        anio_valor_comercial = another_args.get('anio_valor_comercial')
+        clave_catastral = another_args.get('clave_catastral')
+        base_predial = another_args.get('base_predial')
+        adeudo_predial = another_args.get('adeudo_predial')
+        anios_pend_predial = another_args.get('anios_pend_predial')
+        proyecto_id = another_args.get('proyecto_id')
 
         page = args.get('page')
         page_size = args.get('page_size')
         offset = (page - 1) * page_size
 
         columns = [
-            'propiedad_nombre',
-            'nombre_terreno',
-            'numero_fraccion',
+            'id',
+            'clave',
+            'nombre',
+            'superficie',
+            'valor_comercial',
+            'valor_comercial_usd',
+            'anio_valor_comercial',
+            'clave_catastral',
             'base_predial',
             'adeudo_predial',
             'anios_pend_predial',
-            'comentarios'
+            'comentarios',
+            'proyecto_id',
+            'created_at',
+            'updated_at'
         ]
 
         query = """
-            SELECT p.nombre AS propiedad_nombre, s.nombre_terreno, s.numero_fraccion, s.base_predial, s.adeudo_predial, s.anios_pend_predial, s.comentarios
-            FROM slrc_1 s
-            JOIN propiedades p ON s.propiedad_id = p.id
+            SELECT
+                id,
+                clave,
+                nombre,
+                superficie,
+                valor_comercial,
+                valor_comercial_usd,
+                anio_valor_comercial,
+                clave_catastral,
+                base_predial,
+                adeudo_predial,
+                anios_pend_predial,
+                comentarios,
+                proyecto_id,
+                created_at,
+                updated_at
+            FROM propiedad
+            WHERE
+                (%s IS NULL OR clave = %s)
+                AND (%s IS NULL OR nombre = %s)
+                AND (%s IS NULL OR superficie = %s)
+                AND (%s IS NULL OR valor_comercial = %s)
+                AND (%s IS NULL OR valor_comercial_usd = %s)
+                AND (%s IS NULL OR anio_valor_comercial = %s)
+                AND (%s IS NULL OR clave_catastral = %s)
+                AND (%s IS NULL OR base_predial = %s)
+                AND (%s IS NULL OR adeudo_predial = %s)
+                AND (%s IS NULL OR anios_pend_predial = %s)
+                AND (%s IS NULL OR proyecto_id = %s)
             LIMIT %s OFFSET %s;
         """
 
-        params = (page_size, offset)
+        params = (
+            clave, clave,
+            nombre, nombre,
+            superficie, superficie,
+            valor_comercial, valor_comercial,
+            valor_comercial_usd, valor_comercial_usd,
+            anio_valor_comercial, anio_valor_comercial,
+            clave_catastral, clave_catastral,
+            base_predial, base_predial,
+            adeudo_predial, adeudo_predial,
+            anios_pend_predial, anios_pend_predial,
+            proyecto_id, proyecto_id,
+            page_size, offset
+        )
 
         try:
             result = execute_query(query, columns, params)
@@ -771,21 +626,177 @@ class Slrc1(Resource):
         except PGError as e:
             return jsonify({'message': str(e)})
 
+# CREATE TABLE renta(
+#     id SERIAL PRIMARY KEY,
+#     nombre_comercial VARCHAR(255) NOT NULL,
+#     renta_iva_incluida FLOAT NOT NULL,
+#     deposito_garantia_concepto VARCHAR(255),
+#     deposito_garantia_renta FLOAT,
+#     meses_gracia_concepto VARCHAR(255),
+#     meses_gracia_fecha_inicio DATE,
+#     meses_gracia_fecha_fin DATE,
+#     renta_anticipada_concepto VARCHAR(255),
+#     renta_anticipada_fecha_inicio DATE,
+#     renta_anticipada_fecha_fin DATE,
+#     renta_anticipada_renta_iva_incluida FLOAT,
+#     incremento_mes VARCHAR(255),
+#     incremento_descripcion VARCHAR(255),
+#     inicio_vigencia DATE NOT NULL,
+#     fin_vigencia_forzosa DATE NOT NULL,
+#     fin_vigencia_no_forzosa DATE,
+#     vigencia VARCHAR(255),
+#     tiempo_restante VARCHAR(255),
+#     incidencias TEXT,
+#     proyecto_id INT NOT NULL REFERENCES proyecto(id) ON DELETE CASCADE,
+#     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+#     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+# );
+renta_parser = reqparse.RequestParser()
+renta_parser.add_argument('nombre_comercial', type=str, help='Opcional: Nombre comercial de la renta')
+renta_parser.add_argument('renta_iva_incluida', type=float, help='Opcional: Renta con IVA incluido')
+renta_parser.add_argument('deposito_garantia_renta', type=float, help='Opcional: Renta del depósito de garantía')
+renta_parser.add_argument('meses_gracia_fecha_inicio', type=str, help='Opcional: Fecha de inicio de los meses de gracia')
+renta_parser.add_argument('meses_gracia_fecha_fin', type=str, help='Opcional: Fecha de fin de los meses de gracia')
+renta_parser.add_argument('renta_anticipada_fecha_inicio', type=str, help='Opcional: Fecha de inicio de la renta anticipada')
+renta_parser.add_argument('renta_anticipada_fecha_fin', type=str, help='Opcional: Fecha de fin de la renta anticipada')
+renta_parser.add_argument('renta_anticipada_renta_iva_incluida', type=float, help='Opcional: Renta con IVA incluido de la renta anticipada')
+renta_parser.add_argument('incremento_mes', type=str, help='Opcional: Incremento por mes')
+renta_parser.add_argument('inicio_vigencia', type=str, help='Opcional: Fecha de inicio de la vigencia')
+renta_parser.add_argument('fin_vigencia_forzosa', type=str, help='Opcional: Fecha de fin de la vigencia forzosa')
+renta_parser.add_argument('fin_vigencia_no_forzosa', type=str, help='Opcional: Fecha de fin de la vigencia no forzosa')
+renta_parser.add_argument('vigencia', type=str, help='Opcional: Vigencia')
+renta_parser.add_argument('tiempo_restante', type=str, help='Opcional: Tiempo restante')
+renta_parser.add_argument('proyecto_id', type=int, help='Opcional: ID del proyecto')
 
-api.add_namespace(propiedades_client)
-api.add_namespace(proyectos_client)
+renta_client = Namespace('renta', description='Renta de la base de datos')
+@renta_client.route('/')
+class Renta(Resource):
+    @api.expect(generic_parser, renta_parser)
+    def get(self):
+        args = generic_parser.parse_args()
+        another_args = renta_parser.parse_args()
+
+        nombre_comercial = another_args.get('nombre_comercial')
+        renta_iva_incluida = another_args.get('renta_iva_incluida')
+        deposito_garantia_renta = another_args.get('deposito_garantia_renta')
+        meses_gracia_fecha_inicio = another_args.get('meses_gracia_fecha_inicio')
+        meses_gracia_fecha_fin = another_args.get('meses_gracia_fecha_fin')
+        renta_anticipada_fecha_inicio = another_args.get('renta_anticipada_fecha_inicio')
+        renta_anticipada_fecha_fin = another_args.get('renta_anticipada_fecha_fin')
+        renta_anticipada_renta_iva_incluida = another_args.get('renta_anticipada_renta_iva_incluida')
+        incremento_mes = another_args.get('incremento_mes')
+        inicio_vigencia = another_args.get('inicio_vigencia')
+        fin_vigencia_forzosa = another_args.get('fin_vigencia_forzosa')
+        fin_vigencia_no_forzosa = another_args.get('fin_vigencia_no_forzosa')
+        vigencia = another_args.get('vigencia')
+        tiempo_restante = another_args.get('tiempo_restante')
+        proyecto_id = another_args.get('proyecto_id')
+
+        page = args.get('page')
+        page_size = args.get('page_size')
+        offset = (page - 1) * page_size
+
+        columns = [
+            'id',
+            'nombre_comercial',
+            'renta_iva_incluida',
+            'deposito_garantia_concepto',
+            'deposito_garantia_renta',
+            'meses_gracia_concepto',
+            'meses_gracia_fecha_inicio',
+            'meses_gracia_fecha_fin',
+            'renta_anticipada_concepto',
+            'renta_anticipada_fecha_inicio',
+            'renta_anticipada_fecha_fin',
+            'renta_anticipada_renta_iva_incluida',
+            'incremento_mes',
+            'incremento_descripcion',
+            'inicio_vigencia',
+            'fin_vigencia_forzosa',
+            'fin_vigencia_no_forzosa',
+            'vigencia',
+            'tiempo_restante',
+            'incidencias',
+            'proyecto_id',
+            'created_at',
+            'updated_at'
+        ]
+
+        query = """
+            SELECT 
+                id,
+                nombre_comercial,
+                renta_iva_incluida,
+                deposito_garantia_concepto,
+                deposito_garantia_renta,
+                meses_gracia_concepto,
+                meses_gracia_fecha_inicio,
+                meses_gracia_fecha_fin,
+                renta_anticipada_concepto,
+                renta_anticipada_fecha_inicio,
+                renta_anticipada_fecha_fin,
+                renta_anticipada_renta_iva_incluida,
+                incremento_mes,
+                incremento_descripcion,
+                inicio_vigencia,
+                fin_vigencia_forzosa,
+                fin_vigencia_no_forzosa,
+                vigencia,
+                tiempo_restante,
+                incidencias,
+                proyecto_id,
+                created_at,
+                updated_at
+            FROM renta
+            WHERE
+                (%s IS NULL OR nombre_comercial = %s)
+                AND (%s IS NULL OR renta_iva_incluida = %s)
+                AND (%s IS NULL OR deposito_garantia_renta = %s)
+                AND (%s IS NULL OR meses_gracia_fecha_inicio = %s)
+                AND (%s IS NULL OR meses_gracia_fecha_fin = %s)
+                AND (%s IS NULL OR renta_anticipada_fecha_inicio = %s)
+                AND (%s IS NULL OR renta_anticipada_fecha_fin = %s)
+                AND (%s IS NULL OR renta_anticipada_renta_iva_incluida = %s)
+                AND (%s IS NULL OR incremento_mes = %s)
+                AND (%s IS NULL OR inicio_vigencia = %s)
+                AND (%s IS NULL OR fin_vigencia_forzosa = %s)
+                AND (%s IS NULL OR fin_vigencia_no_forzosa = %s)
+                AND (%s IS NULL OR vigencia = %s)
+                AND (%s IS NULL OR tiempo_restante = %s)
+                AND (%s IS NULL OR proyecto_id = %s)
+            LIMIT %s OFFSET %s;
+        """
+
+        params = (
+            nombre_comercial, nombre_comercial,
+            renta_iva_incluida, renta_iva_incluida,
+            deposito_garantia_renta, deposito_garantia_renta,
+            meses_gracia_fecha_inicio, meses_gracia_fecha_inicio,
+            meses_gracia_fecha_fin, meses_gracia_fecha_fin,
+            renta_anticipada_fecha_inicio, renta_anticipada_fecha_inicio,
+            renta_anticipada_fecha_fin, renta_anticipada_fecha_fin,
+            renta_anticipada_renta_iva_incluida, renta_anticipada_renta_iva_incluida,
+            incremento_mes, incremento_mes,
+            inicio_vigencia, inicio_vigencia,
+            fin_vigencia_forzosa, fin_vigencia_forzosa,
+            fin_vigencia_no_forzosa, fin_vigencia_no_forzosa,
+            vigencia, vigencia,
+            tiempo_restante, tiempo_restante,
+            proyecto_id, proyecto_id,
+            page_size, offset
+        )
+
+        try:
+            result = execute_query(query, columns, params)
+            return jsonify(result)
+        except PGError as e:
+            return jsonify({'message': str(e)})
+
 api.add_namespace(sociedades_client)
-api.add_namespace(contratos_client)
-api.add_namespace(finanzas_client)
-api.add_namespace(incidencias_client)
-api.add_namespace(bilbao_comercial_client)
-api.add_namespace(andenes_client)
-api.add_namespace(pto_peniasco_client)
-api.add_namespace(twwg_las_palomas_client)
-api.add_namespace(slrc_1_client)
-
-# app = WSGIMiddleware(app)
-
-# if __name__ == "__main__":
-#     port = int(os.environ.get("PORT", 5000))  # Usa 5000 como valor predeterminado
-#     app.run(host="0.0.0.0", port=port, debug=True)
+api.add_namespace(estatus_legal_client)
+api.add_namespace(ubicacion_client)
+api.add_namespace(proyectos_client)
+api.add_namespace(proyecto_sociedad_client)
+api.add_namespace(proyecto_estatus_ubicacion_client)
+api.add_namespace(propiedades_client)
+api.add_namespace(renta_client)

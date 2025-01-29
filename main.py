@@ -1,7 +1,7 @@
 # create virutal enviroment = python3 -m venv venv
 # open virtual environment = source venv/bin/activate
 # install dependencies = pip install -r requirements.txt
-# turn on the api = python3 main.py
+# turn on the api = python3/hypercorn main.py
 
 import os
 import socket
@@ -271,6 +271,9 @@ proyectos_parser.add_argument('responsable', type=str, help='Opcional: Responsab
 proyectos_parser.add_argument('estatus_activo_no_activo', type=str, help='Opcional: Estatus activo/no activo del proyecto')
 proyectos_parser.add_argument('categoria', type=str, help='Opcional: Categoría del proyecto')
 proyectos_parser.add_argument('abogado', type=str, help='Opcional: Abogado del proyecto')
+proyectos_parser.add_argument('sociedad', type=int, help='Opcional: ID de la sociedad')
+proyectos_parser.add_argument('estatus_legal', type=int, help='Opcional: ID del estatus legal')
+proyectos_parser.add_argument('ubicacion', type=int, help='Opcional: ID de la ubicación')
 
 proyectos_client = Namespace('proyectos', description='Proyectos de la base de datos')
 @proyectos_client.route('/')
@@ -295,6 +298,9 @@ class Proyectos(Resource):
         estatus_activo_no_activo = another_args.get('estatus_activo_no_activo')
         categoria = another_args.get('categoria')
         abogado = another_args.get('abogado')
+        sociedad = another_args.get('sociedad')
+        estatus_legal = another_args.get('estatus_legal')
+        ubicacion = another_args.get('ubicacion')
 
         page = args.get('page')
         page_size = args.get('page_size')
@@ -324,42 +330,56 @@ class Proyectos(Resource):
 
         query = """
             SELECT
-                id,
-                clave,
-                prioridad,
-                nombre,
-                superficie_total,
-                propietario,
-                tipo_propiedad,
-                socios,
-                rfc,
-                tiene_garantia,
-                vocacion,
-                vocacion_especifica,
-                responsable,
-                estatus_activo_no_activo,
-                categoria,
-                comentarios,
-                abogado,
-                created_at,
-                updated_at
-            FROM proyecto
+                p.id,
+                p.clave,
+                p.prioridad,
+                p.nombre,
+                p.superficie_total,
+                p.propietario,
+                p.tipo_propiedad,
+                p.socios,
+                p.rfc,
+                p.tiene_garantia,
+                p.vocacion,
+                p.vocacion_especifica,
+                p.responsable,
+                p.estatus_activo_no_activo,
+                p.categoria,
+                p.comentarios,
+                p.abogado,
+                p.created_at,
+                p.updated_at,
+                s.id AS sociedad_id,
+                s.porcentaje_participacion,
+                u.id AS ubicacion_id,
+                u.nombre AS ubicacion_nombre,
+                e.id AS estatus_legal_id,
+                e.nombre AS estatus_legal_nombre
+            FROM proyecto p
+            LEFT JOIN proyecto_sociedad ps ON p.id = ps.proyecto_id
+            LEFT JOIN sociedad s ON ps.sociedad_id = s.id
+            LEFT JOIN proyecto_estatus_ubicacion peu ON p.id = peu.proyecto_id
+            LEFT JOIN ubicacion u ON peu.ubicacion_id = u.id
+            LEFT JOIN estatus_legal e ON peu.estatus_legal_id = e.id
             WHERE
-                (%s IS NULL OR clave = %s)
-                AND (%s IS NULL OR prioridad = %s)
-                AND (%s IS NULL OR nombre = %s)
-                AND (%s IS NULL OR superficie_total = %s)
-                AND (%s IS NULL OR propietario = %s)
-                AND (%s IS NULL OR tipo_propiedad = %s)
-                AND (%s IS NULL OR socios = %s)
-                AND (%s IS NULL OR rfc = %s)
-                AND (%s IS NULL OR tiene_garantia = %s)
-                AND (%s IS NULL OR vocacion = %s)
-                AND (%s IS NULL OR vocacion_especifica = %s)
-                AND (%s IS NULL OR responsable = %s)
-                AND (%s IS NULL OR estatus_activo_no_activo = %s)
-                AND (%s IS NULL OR categoria = %s)
-                AND (%s IS NULL OR abogado = %s)
+                (%s IS NULL OR p.clave = %s)
+                AND (%s IS NULL OR p.prioridad = %s)
+                AND (%s IS NULL OR p.nombre = %s)
+                AND (%s IS NULL OR p.superficie_total = %s)
+                AND (%s IS NULL OR p.propietario = %s)
+                AND (%s IS NULL OR p.tipo_propiedad = %s)
+                AND (%s IS NULL OR p.socios = %s)
+                AND (%s IS NULL OR p.rfc = %s)
+                AND (%s IS NULL OR p.tiene_garantia = %s)
+                AND (%s IS NULL OR p.vocacion = %s)
+                AND (%s IS NULL OR p.vocacion_especifica = %s)
+                AND (%s IS NULL OR p.responsable = %s)
+                AND (%s IS NULL OR p.estatus_activo_no_activo = %s)
+                AND (%s IS NULL OR p.categoria = %s)
+                AND (%s IS NULL OR p.abogado = %s)
+                AND (%s IS NULL OR s.id = %s)
+                AND (%s IS NULL OR u.id = %s)
+                AND (%s IS NULL OR e.id = %s)
             LIMIT %s OFFSET %s;
         """
 
@@ -379,6 +399,9 @@ class Proyectos(Resource):
             estatus_activo_no_activo, estatus_activo_no_activo,
             categoria, categoria,
             abogado, abogado,
+            sociedad, sociedad,
+            ubicacion, ubicacion,
+            estatus_legal, estatus_legal,
             page_size, offset
         )
 

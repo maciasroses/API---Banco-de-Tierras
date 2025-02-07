@@ -670,7 +670,7 @@ class Propiedades(Resource):
 #     vigencia VARCHAR(255),
 #     tiempo_restante VARCHAR(255),
 #     incidencias TEXT,
-#     proyecto_id INT NOT NULL REFERENCES proyecto(id) ON DELETE CASCADE,
+#     propiedad_id INT NOT NULL REFERENCES propiedad(id) ON DELETE CASCADE,
 #     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 #     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 # );
@@ -689,7 +689,7 @@ renta_parser.add_argument('fin_vigencia_forzosa', type=str, help='Opcional: Fech
 renta_parser.add_argument('fin_vigencia_no_forzosa', type=str, help='Opcional: Fecha de fin de la vigencia no forzosa')
 renta_parser.add_argument('vigencia', type=str, help='Opcional: Vigencia')
 renta_parser.add_argument('tiempo_restante', type=str, help='Opcional: Tiempo restante')
-renta_parser.add_argument('proyecto_id', type=int, help='Opcional: ID del proyecto')
+renta_parser.add_argument('propiedad_id', type=int, help='Opcional: ID de la propiedad')
 
 renta_client = Namespace('renta', description='Renta de la base de datos')
 @renta_client.route('/')
@@ -713,7 +713,7 @@ class Renta(Resource):
         fin_vigencia_no_forzosa = another_args.get('fin_vigencia_no_forzosa')
         vigencia = another_args.get('vigencia')
         tiempo_restante = another_args.get('tiempo_restante')
-        proyecto_id = another_args.get('proyecto_id')
+        propiedad_id = another_args.get('propiedad_id')
 
         page = args.get('page')
         page_size = args.get('page_size')
@@ -740,7 +740,7 @@ class Renta(Resource):
             'vigencia',
             'tiempo_restante',
             'incidencias',
-            'proyecto_id',
+            'propiedad_id',
             'created_at',
             'updated_at'
         ]
@@ -767,7 +767,7 @@ class Renta(Resource):
                 vigencia,
                 tiempo_restante,
                 incidencias,
-                proyecto_id,
+                propiedad_id,
                 created_at,
                 updated_at
             FROM renta
@@ -786,7 +786,7 @@ class Renta(Resource):
                 AND (%s IS NULL OR fin_vigencia_no_forzosa = %s)
                 AND (%s IS NULL OR vigencia = %s)
                 AND (%s IS NULL OR tiempo_restante = %s)
-                AND (%s IS NULL OR proyecto_id = %s)
+                AND (%s IS NULL OR propiedad_id = %s)
             LIMIT %s OFFSET %s;
         """
 
@@ -805,7 +805,7 @@ class Renta(Resource):
             fin_vigencia_no_forzosa, fin_vigencia_no_forzosa,
             vigencia, vigencia,
             tiempo_restante, tiempo_restante,
-            proyecto_id, proyecto_id,
+            propiedad_id, propiedad_id,
             page_size, offset
         )
 

@@ -652,6 +652,7 @@ class Propiedades(Resource):
 # CREATE TABLE renta(
 #     id SERIAL PRIMARY KEY,
 #     nombre_comercial VARCHAR(255) NOT NULL,
+#     razon_social VARCHAR(255),
 #     renta_iva_incluida FLOAT NOT NULL,
 #     deposito_garantia_concepto VARCHAR(255),
 #     deposito_garantia_renta FLOAT,
@@ -670,12 +671,12 @@ class Propiedades(Resource):
 #     vigencia VARCHAR(255),
 #     tiempo_restante VARCHAR(255),
 #     incidencias TEXT,
-#     propiedad_id INT NOT NULL REFERENCES propiedad(id) ON DELETE CASCADE,
 #     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 #     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 # );
 renta_parser = reqparse.RequestParser()
 renta_parser.add_argument('nombre_comercial', type=str, help='Opcional: Nombre comercial de la renta')
+renta_parser.add_argument('razon_social', type=str, help='Opcional: Razón social de la renta')
 renta_parser.add_argument('renta_iva_incluida', type=float, help='Opcional: Renta con IVA incluido')
 renta_parser.add_argument('deposito_garantia_renta', type=float, help='Opcional: Renta del depósito de garantía')
 renta_parser.add_argument('meses_gracia_fecha_inicio', type=str, help='Opcional: Fecha de inicio de los meses de gracia')
@@ -689,7 +690,6 @@ renta_parser.add_argument('fin_vigencia_forzosa', type=str, help='Opcional: Fech
 renta_parser.add_argument('fin_vigencia_no_forzosa', type=str, help='Opcional: Fecha de fin de la vigencia no forzosa')
 renta_parser.add_argument('vigencia', type=str, help='Opcional: Vigencia')
 renta_parser.add_argument('tiempo_restante', type=str, help='Opcional: Tiempo restante')
-renta_parser.add_argument('propiedad_id', type=int, help='Opcional: ID de la propiedad')
 
 renta_client = Namespace('renta', description='Renta de la base de datos')
 @renta_client.route('/')
@@ -700,6 +700,7 @@ class Renta(Resource):
         another_args = renta_parser.parse_args()
 
         nombre_comercial = another_args.get('nombre_comercial')
+        razon_social = another_args.get('razon_social')
         renta_iva_incluida = another_args.get('renta_iva_incluida')
         deposito_garantia_renta = another_args.get('deposito_garantia_renta')
         meses_gracia_fecha_inicio = another_args.get('meses_gracia_fecha_inicio')
@@ -713,7 +714,6 @@ class Renta(Resource):
         fin_vigencia_no_forzosa = another_args.get('fin_vigencia_no_forzosa')
         vigencia = another_args.get('vigencia')
         tiempo_restante = another_args.get('tiempo_restante')
-        propiedad_id = another_args.get('propiedad_id')
 
         page = args.get('page')
         page_size = args.get('page_size')
@@ -722,6 +722,7 @@ class Renta(Resource):
         columns = [
             'id',
             'nombre_comercial',
+            'razon_social',
             'renta_iva_incluida',
             'deposito_garantia_concepto',
             'deposito_garantia_renta',
@@ -740,7 +741,6 @@ class Renta(Resource):
             'vigencia',
             'tiempo_restante',
             'incidencias',
-            'propiedad_id',
             'created_at',
             'updated_at'
         ]
@@ -749,6 +749,7 @@ class Renta(Resource):
             SELECT 
                 id,
                 nombre_comercial,
+                razon_social,
                 renta_iva_incluida,
                 deposito_garantia_concepto,
                 deposito_garantia_renta,
@@ -767,12 +768,12 @@ class Renta(Resource):
                 vigencia,
                 tiempo_restante,
                 incidencias,
-                propiedad_id,
                 created_at,
                 updated_at
             FROM renta
             WHERE
                 (%s IS NULL OR nombre_comercial = %s)
+                AND (%s IS NULL OR razon_social = %s)
                 AND (%s IS NULL OR renta_iva_incluida = %s)
                 AND (%s IS NULL OR deposito_garantia_renta = %s)
                 AND (%s IS NULL OR meses_gracia_fecha_inicio = %s)
@@ -786,12 +787,12 @@ class Renta(Resource):
                 AND (%s IS NULL OR fin_vigencia_no_forzosa = %s)
                 AND (%s IS NULL OR vigencia = %s)
                 AND (%s IS NULL OR tiempo_restante = %s)
-                AND (%s IS NULL OR propiedad_id = %s)
             LIMIT %s OFFSET %s;
         """
 
         params = (
             nombre_comercial, nombre_comercial,
+            razon_social, razon_social,
             renta_iva_incluida, renta_iva_incluida,
             deposito_garantia_renta, deposito_garantia_renta,
             meses_gracia_fecha_inicio, meses_gracia_fecha_inicio,
@@ -805,9 +806,62 @@ class Renta(Resource):
             fin_vigencia_no_forzosa, fin_vigencia_no_forzosa,
             vigencia, vigencia,
             tiempo_restante, tiempo_restante,
-            propiedad_id, propiedad_id,
             page_size, offset
         )
+
+        try:
+            result = execute_query(query, columns, params)
+            return jsonify(result)
+        except PGError as e:
+            return jsonify({'message': str(e)})
+
+# CREATE TABLE propiedad_renta(
+#     propiedad_id INT NOT NULL REFERENCES propiedad(id) ON DELETE CASCADE,
+#     renta_id INT NOT NULL REFERENCES renta(id) ON DELETE CASCADE,
+#     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+#     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+#     UNIQUE (propiedad_id, renta_id)
+# );
+propiedad_renta_parser = reqparse.RequestParser()
+propiedad_renta_parser.add_argument('propiedad_id', type=int, help='Opcional: ID de la propiedad')
+propiedad_renta_parser.add_argument('renta_id', type=int, help='Opcional: ID de la renta')
+
+propiedad_renta_client = Namespace('propiedad_renta', description='Propiedad Renta de la base de datos')
+@propiedad_renta_client.route('/')
+class PropiedadRenta(Resource):
+    @api.expect(generic_parser, propiedad_renta_parser)
+    def get(self):
+        args = generic_parser.parse_args()
+        another_args = propiedad_renta_parser.parse_args()
+
+        propiedad_id = another_args.get('propiedad_id')
+        renta_id = another_args.get('renta_id')
+
+        page = args.get('page')
+        page_size = args.get('page_size')
+        offset = (page - 1) * page_size
+
+        columns = [
+            'propiedad_id',
+            'renta_id',
+            'created_at',
+            'updated_at'
+        ]
+
+        query = """
+            SELECT
+                propiedad_id,
+                renta_id,
+                created_at,
+                updated_at
+            FROM propiedad_renta
+            WHERE
+                (%s IS NULL OR propiedad_id = %s)
+                AND (%s IS NULL OR renta_id = %s)
+            LIMIT %s OFFSET %s;
+        """
+
+        params = (propiedad_id, propiedad_id, renta_id, renta_id, page_size, offset)
 
         try:
             result = execute_query(query, columns, params)
@@ -823,3 +877,4 @@ api.add_namespace(proyecto_sociedad_client)
 api.add_namespace(proyecto_estatus_ubicacion_client)
 api.add_namespace(propiedades_client)
 api.add_namespace(renta_client)
+api.add_namespace(propiedad_renta_client)
